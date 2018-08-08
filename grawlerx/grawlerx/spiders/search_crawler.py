@@ -21,14 +21,21 @@ class SearchCrawler(Spider):
       yield Request(new_url, self.parse)
 
   def parse(self, response):
-    # print(response.url)
-    # print(response.body)
-    yield {
+    try:
+      yield {
       'url': response.url,
       'title': response.xpath("//title/text()")[0].extract(),
-      # 'description': response.xpath("//meta[@property='og:description']/@content")[0].extract(),
+      'meta': response.meta,
+      'description': response.xpath("//meta[@name='description']/@content")[0].extract(), # not all sites have this
       'body': response.body
-    }
+    }  
+    except (ValueError, IndexError):
+      # print('Could not yield this response url - ' + response.url + '. Just yield the rest')
+      yield {
+        'url': response.url,
+        'title': response.xpath("//title/text()")[0].extract(),
+        'meta': response.meta
+      }
 
 # reformat urls
 def reformat_url(url):
