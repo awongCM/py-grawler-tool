@@ -60,6 +60,7 @@ instance/
 
 # Scrapy stuff:
 .scrapy
+grawlerx/data/
 
 # Sphinx documentation
 docs/_build/

@@ -1,12 +1,79 @@
 # py-grawler-tool
 
-A very simple implementation of web search crawler that emulates the same behaviour as Google search engine using Scrapy.
+A small Scrapy-based web crawler that discovers keyword-relevant pages, stores them in a local SQLite FTS5 index, and exposes a minimal search API.
 
-## TODO
-1. Implement the keyword search algorithm for finding and storing relevants sites
-2. Create a back-end search api for servicing the keyword search to retrieve all relevant urls
-3. Havea a front-end app to interact the back-end service that emulates the same look-and-feel of Google search results page
+This repo focuses on the **crawl + index + search internals** for learning purposes. It is not meant to compete with production search engines.
+
+## What it does
+
+1. **Keyword crawl** — starts from seed URLs, scores each page for keyword relevance, and follows promising outbound links up to a configurable depth.
+2. **Local index** — persists title, description, body text, and relevance score in SQLite with an FTS5 full-text index.
+3. **Search API** — serves keyword queries over the indexed pages via FastAPI.
+
+## Project layout
+
+```text
+grawlerx/
+  grawlerx/
+    spiders/search_crawler.py   # keyword-aware crawler
+    keyword_search.py           # relevance scoring + FTS query builder
+    storage.py                  # SQLite + FTS5 persistence
+    search_service.py           # read-side search service
+    api.py                      # HTTP API
+  urls_with_cow_keywords.txt    # sample seed URLs
+  data/grawlerx.db              # generated at runtime
+```
+
+## Setup
+
+```bash
+cd grawlerx
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Run a crawl
+
+```bash
+python -m grawlerx crawl --keywords "cow,cattle" --max-depth 1
+```
+
+Optional flags:
+
+- `--seeds-file` path to a newline-delimited URL list
+- `--min-score` minimum relevance score before a page is stored (default `0.15`)
+- `--max-depth` link-follow depth from each seed (default `1`)
+
+## Search the index
+
+CLI:
+
+```bash
+python -m grawlerx search "cattle"
+```
+
+HTTP API:
+
+```bash
+python -m grawlerx serve --port 8000
+curl "http://localhost:8000/search?q=cattle"
+curl "http://localhost:8000/health"
+```
+
+## Tests
+
+```bash
+cd grawlerx
+pytest -q
+```
+
+## Still out of scope
+
+- Google-like frontend UI
+- Large-scale distributed crawling
+- Production-grade ranking or freshness
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE) file for details
+MIT — see [LICENSE](LICENSE).
