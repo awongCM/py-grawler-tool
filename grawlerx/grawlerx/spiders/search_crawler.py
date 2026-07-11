@@ -16,8 +16,9 @@ class SearchCrawler(Spider):
     name = "search-crawler"
     start_urls: list[str] = []
 
+    # Depth is enforced in parse(); Scrapy's middleware is disabled (0 = no limit).
     custom_settings = {
-        "DEPTH_LIMIT": 1,
+        "DEPTH_LIMIT": 0,
     }
 
     def __init__(
@@ -35,6 +36,11 @@ class SearchCrawler(Spider):
         self.max_depth = int(max_depth)
         self.seeds_path = Path(seeds_file) if seeds_file else DEFAULT_SEEDS_FILE
         self.start_urls = self._load_seed_urls()
+
+        if not self.keywords:
+            raise ValueError(
+                "At least one keyword is required (e.g. -a keywords=cow,cattle)"
+            )
 
     def _load_seed_urls(self) -> list[str]:
         if not self.seeds_path.exists():
@@ -57,6 +63,13 @@ class SearchCrawler(Spider):
             yield Request(url, callback=self.parse, meta={"depth": 0})
 
     def parse(self, response):
+        if response.status >= 400:
+            return
+
+        content_type = (response.headers.get("Content-Type") or b"").decode("latin-1").lower()
+        if content_type and "html" not in content_type:
+            return
+
         title = self._extract_title(response)
         description = self._extract_description(response)
         body = self._extract_body_text(response)

@@ -56,10 +56,12 @@ python -m grawlerx search "cattle"
 HTTP API:
 
 ```bash
-python -m grawlerx serve --port 8000
+python -m grawlerx serve --host 0.0.0.0 --port 8000
 curl "http://localhost:8000/search?q=cattle"
 curl "http://localhost:8000/health"
 ```
+
+The API binds to `127.0.0.1` by default for local use. Pass `--host 0.0.0.0` when deploying behind a proxy.
 
 ## Tests
 

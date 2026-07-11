@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from grawlerx.keyword_search import build_fts_query
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "grawlerx.db"
+SQLITE_BUSY_RETRIES = 5
+SQLITE_BUSY_BACKOFF_SECONDS = 0.05
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS pages (
@@ -63,8 +65,10 @@ class SearchResult:
 def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
+    connection = sqlite3.connect(path, timeout=30.0)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA busy_timeout=30000")
     return connection
 
 
@@ -72,6 +76,16 @@ def init_db(db_path: Path | str | None = None) -> None:
     with connect(db_path) as connection:
         connection.executescript(SCHEMA)
         connection.commit()
+
+
+def _run_with_retry(operation):
+    for attempt in range(SQLITE_BUSY_RETRIES):
+        try:
+            return operation()
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == SQLITE_BUSY_RETRIES - 1:
+                raise
+            time.sleep(SQLITE_BUSY_BACKOFF_SECONDS * (attempt + 1))
 
 
 def upsert_page(
@@ -85,22 +99,26 @@ def upsert_page(
     db_path: Path | str | None = None,
 ) -> None:
     crawled_at = datetime.now(timezone.utc).isoformat()
-    with connect(db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO pages (url, title, description, body, relevance_score, keywords, crawled_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(url) DO UPDATE SET
-                title=excluded.title,
-                description=excluded.description,
-                body=excluded.body,
-                relevance_score=excluded.relevance_score,
-                keywords=excluded.keywords,
-                crawled_at=excluded.crawled_at
-            """,
-            (url, title, description, body, relevance_score, keywords, crawled_at),
-        )
-        connection.commit()
+
+    def _write() -> None:
+        with connect(db_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO pages (url, title, description, body, relevance_score, keywords, crawled_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                    title=excluded.title,
+                    description=excluded.description,
+                    body=excluded.body,
+                    relevance_score=excluded.relevance_score,
+                    keywords=excluded.keywords,
+                    crawled_at=excluded.crawled_at
+                """,
+                (url, title, description, body, relevance_score, keywords, crawled_at),
+            )
+            connection.commit()
+
+    _run_with_retry(_write)
 
 
 def search_pages(
@@ -113,23 +131,26 @@ def search_pages(
     if not fts_query:
         return []
 
-    with connect(db_path) as connection:
-        rows = connection.execute(
-            """
-            SELECT
-                p.url,
-                COALESCE(p.title, '') AS title,
-                COALESCE(p.description, '') AS description,
-                p.relevance_score,
-                bm25(pages_fts) AS rank
-            FROM pages_fts
-            JOIN pages AS p ON p.id = pages_fts.rowid
-            WHERE pages_fts MATCH ?
-            ORDER BY rank, p.relevance_score DESC
-            LIMIT ?
-            """,
-            (fts_query, limit),
-        ).fetchall()
+    try:
+        with connect(db_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    p.url,
+                    COALESCE(p.title, '') AS title,
+                    COALESCE(p.description, '') AS description,
+                    p.relevance_score,
+                    bm25(pages_fts) AS rank
+                FROM pages_fts
+                JOIN pages AS p ON p.id = pages_fts.rowid
+                WHERE pages_fts MATCH ?
+                ORDER BY rank, p.relevance_score DESC
+                LIMIT ?
+                """,
+                (fts_query, limit),
+            ).fetchall()
+    except sqlite3.OperationalError:
+        return []
 
     return [
         SearchResult(

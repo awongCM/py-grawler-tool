@@ -28,6 +28,18 @@ def tokenize(text: str | None) -> set[str]:
     return {token.lower() for token in WORD_RE.findall(text)}
 
 
+def field_matches_keywords(text: str | None, keywords: Sequence[str]) -> bool:
+    """Match keywords via token overlap or substring (for URLs/compound words)."""
+    if not text or not keywords:
+        return False
+
+    keyword_set = {keyword.lower() for keyword in keywords}
+    haystack_lower = text.lower()
+    if any(keyword in haystack_lower for keyword in keyword_set):
+        return True
+    return bool(tokenize(text) & keyword_set)
+
+
 def score_page(
     keywords: Sequence[str],
     *,
@@ -40,12 +52,11 @@ def score_page(
     if not keywords:
         return 0.0
 
-    keyword_set = {keyword.lower() for keyword in keywords}
     fields = {
         "title": title,
         "description": description,
         "url": url,
-        "body": body[:5000],
+        "body": body,
     }
 
     weighted_hits = 0.0
@@ -53,8 +64,7 @@ def score_page(
     for field_name, field_value in fields.items():
         weight = FIELD_WEIGHTS[field_name]
         total_weight += weight
-        field_tokens = tokenize(field_value)
-        if field_tokens & keyword_set:
+        if field_matches_keywords(field_value, keywords):
             weighted_hits += weight
 
     return round(weighted_hits / total_weight, 4) if total_weight else 0.0
@@ -62,13 +72,12 @@ def score_page(
 
 def link_is_promising(url: str, anchor_text: str, keywords: Iterable[str]) -> bool:
     """Heuristic for whether a discovered link is worth fetching."""
-    haystack = f"{url} {anchor_text}".lower()
-    return any(keyword.lower() in haystack for keyword in keywords)
+    return field_matches_keywords(f"{url} {anchor_text}", list(keywords))
 
 
 def build_fts_query(user_query: str) -> str:
-    """Turn free text into a safe FTS5 AND query."""
+    """Turn free text into a safe FTS5 OR query."""
     terms = parse_keywords(user_query)
     if not terms:
         return ""
-    return " ".join(f'"{term}"' for term in terms)
+    return " OR ".join(f'"{term}"' for term in terms)
