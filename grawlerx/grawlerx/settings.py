@@ -9,10 +9,18 @@
 #     https://doc.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
+import os
+from pathlib import Path
+
 BOT_NAME = 'grawlerx'
 
 SPIDER_MODULES = ['grawlerx.spiders']
 NEWSPIDER_MODULE = 'grawlerx.spiders'
+
+GRAWLERX_DB_PATH = os.environ.get(
+    'GRAWLERX_DB_PATH',
+    str(Path(__file__).resolve().parent.parent / 'data' / 'grawlerx.db'),
+)
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -64,9 +72,9 @@ ROBOTSTXT_OBEY = True
 
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'grawlerx.pipelines.GrawlerxPipeline': 300,
-#}
+ITEM_PIPELINES = {
+    'grawlerx.pipelines.StoragePipeline': 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://doc.scrapy.org/en/latest/topics/autothrottle.html
