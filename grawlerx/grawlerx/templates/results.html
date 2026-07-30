@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ query }} - Grawlerx{% endblock %}
+{% block body_class %}results{% endblock %}
+
+{% block content %}
+<header class="results-header">
+  <a href="/" class="logo-small">Grawlerx</a>
+  <form class="search-form compact" action="/results" method="get">
+    <input type="search" name="q" class="search-input" value="{{ query }}" required>
+    <button type="submit">Search</button>
+  </form>
+</header>
+
+<main class="results-main">
+  <p class="results-meta">About {{ count }} result{% if count != 1 %}s{% endif %}</p>
+
+  {% if results %}
+    <ul class="results-list">
+      {% for result in results %}
+        <li class="result-item">
+          <a class="result-title" href="{{ result.url }}">{{ result.title or result.url }}</a>
+          <p class="result-url">{{ result.url }}</p>
+          <p class="result-snippet">{{ result.snippet }}</p>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty-state">No results for <strong>{{ query }}</strong>. <a href="/">Try another search</a>.</p>
+  {% endif %}
+</main>
+{% endblock %}
