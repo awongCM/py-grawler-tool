@@ -63,6 +63,16 @@ curl "http://localhost:8000/health"
 
 The API binds to `127.0.0.1` by default for local use. Pass `--host 0.0.0.0` when deploying behind a proxy.
 
+## Search in the browser
+
+```bash
+python -m grawlerx serve
+```
+
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/), search, and view results at `/results?q=...`.
+
+The JSON API remains available at `/search?q=...` for programmatic use.
+
 ## Tests
 
 ```bash
@@ -72,7 +82,6 @@ pytest -q
 
 ## Still out of scope
 
-- Google-like frontend UI
 - Large-scale distributed crawling
 - Production-grade ranking or freshness
 

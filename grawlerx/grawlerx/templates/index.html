@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Grawlerx{% endblock %}
+{% block body_class %}landing{% endblock %}
+
+{% block content %}
+<main class="landing-main">
+  <h1 class="logo">Grawlerx</h1>
+  <form class="search-form" action="/results" method="get">
+    <input
+      type="search"
+      name="q"
+      class="search-input"
+      placeholder="Search the crawl index"
+      autofocus
+      required
+    >
+    <div class="search-actions">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+</main>
+{% endblock %}
